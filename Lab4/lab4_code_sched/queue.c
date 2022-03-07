@@ -24,11 +24,10 @@ struct pcb_t * de_queue(struct pqueue_t * q) {
 	// condition
 	
 	// YOUR CODE HERE
+	
+	if (empty(q)) return NULL;
+	
 	pthread_mutex_lock(&(q->lock));
-	if (empty(q)) {
-		pthread_mutex_unlock(&(q->lock));
-		return NULL;
-	}
 	struct qitem_t* qHead = q->head;
 	q->head = q->head->next;
 	pthread_mutex_unlock(&(q->lock));

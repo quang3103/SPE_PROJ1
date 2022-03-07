@@ -18,9 +18,12 @@ struct mem_region {
 struct mem_region * free_regions = NULL;
 struct mem_region * used_regions = NULL;
 
-
 static void * best_fit_allocator(unsigned int size);
 static void * first_fit_allocator(unsigned int size);
+
+static FILE *outputFile;
+static int totalSize = 0;
+static int usedSize = 0;
 
 int mem_init(unsigned int size) {
 	/* Initial lock for multi-thread allocators */
@@ -36,7 +39,10 @@ int mem_init(unsigned int size) {
 	free_regions->pointer = (char*)mem_pool;
 	free_regions->next = NULL;
 	free_regions->prev = NULL;
-
+	
+	outputFile = fopen("memory/output.txt", "w");
+	totalSize = size;
+	usedSize = 0;
 	return (mem_pool != 0);
 }
 
@@ -69,6 +75,15 @@ void mem_finish() {
 	free(mem_pool);
 }
 
+void trace() {
+	struct mem_region * current_region = free_regions;
+	while (current_region != NULL) {
+		fprintf(outputFile, "%zu ", current_region->size);
+		current_region = current_region->next;
+	}
+	fprintf(outputFile, "\n");
+}
+
 void * mem_alloc(unsigned int size) {
 	pthread_mutex_lock(&lock);
 	// Follow is FIST FIT allocator used for demonstration only.
@@ -80,11 +95,17 @@ void * mem_alloc(unsigned int size) {
 	// TODO: uncomment the next line
 	void * pointer = best_fit_allocator(size);
 	
+	fprintf(outputFile, "%d %d\n", totalSize-usedSize, usedSize);
+	trace();
+	
 	// FOR VERIFICATION ONLY. DO NOT REMOVE THESE LINES
 	if (pointer != NULL) {
-		printf("Alloc [%lu bytes] %p-%p\n", size, pointer, (char*)pointer + size - 1);
-	}else{
+		printf("Alloc [%zu bytes] %p-%p\n", size, pointer, (char*)pointer + size - 1);
+		usedSize += size;
+		fprintf(outputFile, "%zu\n", size);
+	} else {
 		printf("Alloc NULL\n");
+		fprintf(outputFile, "0\n");
 	}
 
 	pthread_mutex_unlock(&lock);
@@ -99,13 +120,14 @@ void mem_free(void * pointer) {
 		current_region = current_region->next;
 	}
 	if (current_region != NULL) {
+		usedSize -= current_region->size;
 		// Remove current region from the list of used regions
 		if (current_region == used_regions) {
 			used_regions = used_regions->next;
 			if (used_regions != NULL) {
 				used_regions->prev = NULL;
 			}
-		}else{
+		}else {
 			if (current_region->prev != NULL) {
 				current_region->prev->next = current_region->next;
 			}
@@ -115,7 +137,7 @@ void mem_free(void * pointer) {
 		}
 
 		// FOR VERIFICATION ONLY. DO NOT REMOVE THESE LINES
-		printf("Free  [%lu bytes] %p-%p\n", current_region->size, current_region->pointer,
+		printf("Free  [%zu bytes] %p-%p\n", current_region->size, current_region->pointer,
 				current_region->pointer + current_region->size - 1);
 
 		// Free this region by putting it into free list
@@ -299,5 +321,4 @@ void * first_fit_allocator(unsigned int size) {
 		return NULL;
 	}
 }
-
 

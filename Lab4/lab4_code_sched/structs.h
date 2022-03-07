@@ -12,6 +12,12 @@ struct pcb_t {
 	int burst_time;		// The amount of time that process requires
 				// to complete its job
 	int pid;		// process id
+	
+	int lastTimeInQueue;	//the point of time that this process is put in ready queue
+	int waitingTime;
+	int responseTime;
+	size_t numberOfBytes;	//number of bytes need to be allocated
+	void *mem;		//store the address of memory
 };
 
 /* 'Wrapper' of PCB in a queue */

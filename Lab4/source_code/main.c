@@ -12,14 +12,14 @@ void * proc(void *args) {
 	int index = 0;
 	char * mem[ARRAY_SIZE];
 	for (i = 0; i < ARRAY_SIZE; i++) {
-		if (rand() % 3) {
+		if ((rand() % 3) > 0) {
 			/* Allocate memory */
 			unsigned int size = 1 << ((rand() % 4) + 4);
 			mem[index] = mem_alloc(size);
 			if (mem[index] != NULL) {
 				index++;
 			}
-		}else{
+		}else {
 			// Free memory
 			if (index == 0) {
 				continue;

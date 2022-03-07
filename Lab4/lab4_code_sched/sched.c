@@ -1,14 +1,19 @@
 
 #include "queue.h"
+#include "mem.h"
 #include <pthread.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define TIME_UNIT	100 // In microsecond
+#define TIME_UNIT	100000 // In microsecond
 
 static struct pqueue_t in_queue; // Queue for incomming processes
 static struct pqueue_t ready_queue; // Queue for ready processes
+
+static FILE *outputFile;
+static int CPUFreeTime = 0;
+static int timeActuallyStart = -1;
 
 static int load_done = 0;
 
@@ -30,10 +35,16 @@ void * cpu(void * arg) {
 		if (proc == NULL) {
 			/* If there is no process in the queue then we
 			 * wait until the next time slice */
+			//printf("Timestamp: %d: miss\n", timestamp);
 			timestamp++;
+			if (timeActuallyStart != -1) CPUFreeTime++;
 			usleep(TIME_UNIT);
-		}else{
+		} else {
 			/* Execute the process */
+			if (timeActuallyStart == -1) {
+				timeActuallyStart = timestamp;
+				timestamp -= timestamp;	
+			}
 			int start = timestamp; 	// Save timestamp
 			int id = proc->pid;	// and PID for tracking
 			/* Decide the amount of time that CPU will spend
@@ -47,6 +58,11 @@ void * cpu(void * arg) {
 			// YOUR CODE HERE
 			exec_time = min(proc->burst_time, timeslot);
 			
+			//calculate responseTime
+			if (proc->responseTime == -1) proc->responseTime = timestamp - proc->arrival_time;
+			//calculate waitingTime
+			proc->waitingTime += timestamp - proc->lastTimeInQueue;
+			
 			/* Emulate the execution of the process by using
 			 * 'usleep()' function */
 			usleep(exec_time * TIME_UNIT);
@@ -58,15 +74,33 @@ void * cpu(void * arg) {
 			// burst time is zero. If so, free its PCB. Otherwise,
 			// put its PCB back to the queue.
 			
-			// YOUR CODE HERE
-			proc->burst_time -= exec_time;
-			if (proc->burst_time <= 0) free(proc);
-			else en_queue(&ready_queue, proc);
 			/* Track runtime status */
 			printf("%2d-%2d: Execute %d\n", start, timestamp, id);
+			
+			// YOUR CODE HERE
+			proc->burst_time -= exec_time;
+			if (proc->burst_time == 0) {
+				//calculate turn around time
+				int turnAroundTime = timestamp - proc->arrival_time;
+				printf("\t **** Process ID: %d, Arrival Time: %d, Burst Time: %d, Turn Around Time: %d, Response Time: %d, Waiting Time: %d \n", proc->pid, 
+																			proc->arrival_time, 
+																			proc->burst_time, 
+																			turnAroundTime,
+																			proc->responseTime,
+																			proc->waitingTime);
+																			
+				fprintf(outputFile, "%d %d %d %d %d\n", proc->pid, proc->arrival_time, turnAroundTime, proc->responseTime, proc->waitingTime);
+				mem_free(proc->mem);
+				free(proc);
+				printf("Process exectuion is done, free memory\n");
+			} else {
+				proc->lastTimeInQueue = timestamp;
+				en_queue(&ready_queue, proc);
+			}
 		}
 	}
-
+	printf("CPU free time: %d, Complete Time: %d, CPU Utilization(%): %f\n", CPUFreeTime, timestamp, (double)(timestamp - CPUFreeTime)/timestamp);
+	fprintf(outputFile, "CPU Utilization: %0.3f\n", (double)(timestamp - CPUFreeTime)*100/timestamp);
 	return NULL;
 }
 
@@ -81,7 +115,15 @@ void * loader(void * arg) {
 		usleep(wastetime * TIME_UNIT);
 		/* Update timestamp and put the new process to ready queue */
 		timestamp += wastetime;
-		en_queue(&ready_queue, proc);
+		void* mem = mem_alloc(proc->burst_time*4);
+		if (mem) {
+			proc->mem = mem;
+			proc->lastTimeInQueue = timestamp;
+			proc->waitingTime = 0;
+			proc->responseTime = -1;
+			en_queue(&ready_queue, proc);
+		}
+		//printf("Timestamp: %d | Process ID: %d\n", timestamp, proc->pid);
 	}
 	/* We have no process to load */
 	load_done = 1;
@@ -99,17 +141,21 @@ void load_task() {
 			(struct pcb_t *)malloc(sizeof(struct pcb_t));
 		scanf("%d %d\n", &proc->arrival_time, &proc->burst_time);
 		proc->pid = i;
+		proc->numberOfBytes = proc->burst_time;
 		en_queue(&in_queue, proc);
 	}
 }
 
 int main() {
+
+	outputFile = fopen("schedule/output.txt", "w");
 	pthread_t cpu_id;	// CPU ID
 	pthread_t loader_id;	// LOADER ID
 
 	/* Initialize queues */
 	initialize_queue(&in_queue);
 	initialize_queue(&ready_queue);
+	mem_init(1<<10);
 
 	/* Read a list of jobs to be run */
 	load_task();
@@ -120,10 +166,12 @@ int main() {
 	pthread_create(&cpu_id, NULL, cpu, NULL);
 
 	/* Wait for cpu and loader */
-	pthread_join(cpu_id, NULL);
 	pthread_join(loader_id, NULL);
+	pthread_join(cpu_id, NULL);
+	
 
 	pthread_exit(NULL);
+	mem_finish();
 
 }
 

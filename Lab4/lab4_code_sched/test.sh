@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "Input file:"
-cat input.txt
+cat input/input.txt
 echo "Results"
-gcc sched.c queue.c -o sched -lpthread
-cat input.txt | ./sched
+gcc mem.c sched.c queue.c -o sched -lpthread
+cat input/input.txt | ./sched
