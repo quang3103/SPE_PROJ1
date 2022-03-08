@@ -14,6 +14,7 @@ static struct pqueue_t ready_queue; // Queue for ready processes
 static FILE *outputFile;
 static int CPUFreeTime = 0;
 static int timeActuallyStart = -1;
+static int contextSwitch = 0;
 
 static int load_done = 0;
 
@@ -97,10 +98,13 @@ void * cpu(void * arg) {
 				proc->lastTimeInQueue = timestamp;
 				en_queue(&ready_queue, proc);
 			}
+			//count for context switch
+			contextSwitch += 1;
 		}
 	}
 	printf("CPU free time: %d, Complete Time: %d, CPU Utilization(%): %f\n", CPUFreeTime, timestamp, (double)(timestamp - CPUFreeTime)/timestamp);
-	fprintf(outputFile, "CPU Utilization: %0.3f\n", (double)(timestamp - CPUFreeTime)*100/timestamp);
+	printf("Context switch: %d times\n", contextSwitch);
+	fprintf(outputFile, "%0.3f %d\n", (double)(timestamp - CPUFreeTime)*100/timestamp, contextSwitch);
 	return NULL;
 }
 
