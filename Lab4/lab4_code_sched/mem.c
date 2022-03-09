@@ -85,6 +85,9 @@ void trace() {
 }
 
 void * mem_alloc(unsigned int size) {
+	fprintf(outputFile, "%d %d\n", totalSize-usedSize, usedSize);
+	trace();
+
 	pthread_mutex_lock(&lock);
 	// Follow is FIST FIT allocator used for demonstration only.
 	// You need to implment your own BEST FIT allocator.
@@ -95,7 +98,6 @@ void * mem_alloc(unsigned int size) {
 	// TODO: uncomment the next line
 	void * pointer = best_fit_allocator(size);
 	
-	fprintf(outputFile, "%d %d\n", totalSize-usedSize, usedSize);
 	trace();
 	
 	// FOR VERIFICATION ONLY. DO NOT REMOVE THESE LINES
