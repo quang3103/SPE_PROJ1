@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define TIME_UNIT	100000 // In microsecond
 
@@ -15,7 +16,7 @@ static FILE *outputFile;
 static int CPUFreeTime = 0;
 static int timeActuallyStart = -1;
 static int contextSwitch = 0;
-
+static int sizeOfMemory = 8; //1<<sizeOfMemory
 static int load_done = 0;
 
 static int timeslot; 	// The maximum amount of time a process is allowed
@@ -76,24 +77,24 @@ void * cpu(void * arg) {
 			// put its PCB back to the queue.
 			
 			/* Track runtime status */
-			printf("%2d-%2d: Execute %d\n", start, timestamp, id);
+			//printf("%2d-%2d: Execute %d\n", start, timestamp, id);
 			
 			// YOUR CODE HERE
 			proc->burst_time -= exec_time;
 			if (proc->burst_time == 0) {
 				//calculate turn around time
 				int turnAroundTime = timestamp - proc->arrival_time;
-				printf("\t **** Process ID: %d, Arrival Time: %d, Burst Time: %d, Turn Around Time: %d, Response Time: %d, Waiting Time: %d \n", proc->pid, 
+				/*printf("\t **** Process ID: %d, Arrival Time: %d, Burst Time: %d, Turn Around Time: %d, Response Time: %d, Waiting Time: %d \n", proc->pid, 
 																			proc->arrival_time, 
 																			proc->burst_time, 
 																			turnAroundTime,
 																			proc->responseTime,
-																			proc->waitingTime);
+																			proc->waitingTime);*/
 																			
 				fprintf(outputFile, "%d %d %d %d %d\n", proc->pid, proc->arrival_time, turnAroundTime, proc->responseTime, proc->waitingTime);
 				mem_free(proc->mem);
 				free(proc);
-				printf("Process exectuion is done, free memory\n");
+				//printf("Process exectuion is done, free memory\n");
 			} else {
 				proc->lastTimeInQueue = timestamp;
 				en_queue(&ready_queue, proc);
@@ -102,8 +103,8 @@ void * cpu(void * arg) {
 			contextSwitch += 1;
 		}
 	}
-	printf("CPU free time: %d, Complete Time: %d, CPU Utilization(%): %f\n", CPUFreeTime, timestamp, (double)(timestamp - CPUFreeTime)/timestamp);
-	printf("Context switch: %d times\n", contextSwitch);
+	//printf("CPU free time: %d, Complete Time: %d, CPU Utilization(%): %f\n", CPUFreeTime, timestamp, (double)(timestamp - CPUFreeTime)/timestamp);
+	//printf("Context switch: %d times\n", contextSwitch);
 	fprintf(outputFile, "%0.3f %d\n", (double)(timestamp - CPUFreeTime)*100/timestamp, contextSwitch);
 	return NULL;
 }
@@ -150,16 +151,20 @@ void load_task() {
 	}
 }
 
-int main() {
-
-	outputFile = fopen("schedule/output.txt", "w");
+int main(int argc, const char *argv[]) {
+	//printf("argc : %d | FILE NAME: %s\n", argc, argv[1]);
+	char fileNameFromCMD[30];
+	strcpy(fileNameFromCMD, "schedule/");
+	strcat(fileNameFromCMD, argv[1]);
+	printf("File name: %s\n", fileNameFromCMD);
+	outputFile = fopen(fileNameFromCMD, "w");
 	pthread_t cpu_id;	// CPU ID
 	pthread_t loader_id;	// LOADER ID
 
 	/* Initialize queues */
 	initialize_queue(&in_queue);
 	initialize_queue(&ready_queue);
-	mem_init(1<<10);
+	mem_init(1<<sizeOfMemory, argv[1]);
 
 	/* Read a list of jobs to be run */
 	load_task();
@@ -173,9 +178,8 @@ int main() {
 	pthread_join(loader_id, NULL);
 	pthread_join(cpu_id, NULL);
 	
-
-	pthread_exit(NULL);
 	mem_finish();
+	pthread_exit(NULL);
 
 }
 

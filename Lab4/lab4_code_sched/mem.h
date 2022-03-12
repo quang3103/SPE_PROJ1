@@ -3,7 +3,7 @@
 
 /* Prealocate memory using standard C malloc.
  * This function returns 0 if success, otherwise, return 1 */
-int mem_init(unsigned int size);
+int mem_init(unsigned int size, const char* outputFileName);
 
 /* Allocate a chunks of `size' bytes memory in the preallocated
  * regions created by calling initial function */

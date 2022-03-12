@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h>
 
 void * mem_pool = NULL;
+static int totalMissTimes = 0;
+static int totalHitTimes = 0;
 
 pthread_mutex_t lock;
 
@@ -25,9 +28,9 @@ static FILE *outputFile;
 static int totalSize = 0;
 static int usedSize = 0;
 
-int mem_init(unsigned int size) {
+int mem_init(unsigned int size, const char* outputFileName) {
 	/* Initial lock for multi-thread allocators */
-	printf("The size of memory is: %u \n", size);
+	printf("Total size of memory is: %u \n", size);
 	pthread_mutex_init(&lock, NULL);
 
 	/* Prealocate the mem pool based on used request */
@@ -40,7 +43,11 @@ int mem_init(unsigned int size) {
 	free_regions->next = NULL;
 	free_regions->prev = NULL;
 	
-	outputFile = fopen("memory/output.txt", "w");
+	char fileNameFromCMD[30];
+	strcpy(fileNameFromCMD, "memory/");
+	strcat(fileNameFromCMD, outputFileName);
+	//printf("File name: %s\n", fileNameFromCMD);
+	outputFile = fopen(fileNameFromCMD, "w");
 	totalSize = size;
 	usedSize = 0;
 	return (mem_pool != 0);
@@ -48,6 +55,7 @@ int mem_init(unsigned int size) {
 
 void mem_finish() {
 	/* Delete lock */
+	fprintf(outputFile, "%d %d\n", totalHitTimes, totalMissTimes);
 	pthread_mutex_destroy(&lock);
 	
 	/* Clean lists */
@@ -85,7 +93,7 @@ void trace() {
 }
 
 void * mem_alloc(unsigned int size) {
-	fprintf(outputFile, "%d %d\n", totalSize-usedSize, usedSize);
+	fprintf(outputFile, "%d %d %d\n", totalSize-usedSize, usedSize, size);
 	trace();
 
 	pthread_mutex_lock(&lock);
@@ -102,11 +110,13 @@ void * mem_alloc(unsigned int size) {
 	
 	// FOR VERIFICATION ONLY. DO NOT REMOVE THESE LINES
 	if (pointer != NULL) {
-		printf("Alloc [%zu bytes] %p-%p\n", size, pointer, (char*)pointer + size - 1);
+		//printf("Alloc [%zu bytes] %p-%p\n", size, pointer, (char*)pointer + size - 1);
 		usedSize += size;
+		totalHitTimes += 1;
 		fprintf(outputFile, "%zu\n", size);
 	} else {
-		printf("Alloc NULL\n");
+		//printf("Alloc NULL\n");
+		totalMissTimes += 1;
 		fprintf(outputFile, "0\n");
 	}
 
@@ -139,8 +149,8 @@ void mem_free(void * pointer) {
 		}
 
 		// FOR VERIFICATION ONLY. DO NOT REMOVE THESE LINES
-		printf("Free  [%zu bytes] %p-%p\n", current_region->size, current_region->pointer,
-				current_region->pointer + current_region->size - 1);
+		/*printf("Free  [%zu bytes] %p-%p\n", current_region->size, current_region->pointer,
+				current_region->pointer + current_region->size - 1);*/
 
 		// Free this region by putting it into free list
 		if (free_regions == NULL) {
@@ -218,7 +228,7 @@ void * best_fit_allocator(unsigned int size) {
 	int bestSize = 0;
 	int regionIndex = 1;
 	while (current_region != NULL) {
-		printf("+ Free region %d has size of: %d from %p - %p\n", regionIndex, current_region->size, current_region->pointer, (char*)current_region->pointer + size - 1);
+		//printf("+ Free region %d has size of: %d from %p - %p\n", regionIndex, current_region->size, current_region->pointer, (char*)current_region->pointer + size - 1);
 		if (current_region->size >= size) {
 			if (chosen_region == NULL) { //if we have not choose any region.
 				chosen_region = current_region;
